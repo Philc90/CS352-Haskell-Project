@@ -261,6 +261,26 @@ It'll be easier to use the test functions if you give your parsers the same name
 they parse.
 -}
 
+-- checks if the character is a ternary
+isTernary :: Char -> Bool
+isTernary 'T' = True
+isTernary 'F' = True
+isTernary 'M' = True
+isTernary _ = False
+
+-- Turns character to ternary
+charToTernary :: Char -> Ternary
+charToTernary 'T' = T
+charToTernary 'F' = F
+charToTernary 'M' = M
+
+
+tLit :: Parser TExpTree
+tLit = do space
+          v <- sat isTernary
+          space
+          return (L (charToTernary v))
+
 
 -- TODO: Implement a function parseT that takes a string as input
 -- and returns a ternary logic expression tree (TExpTree)
@@ -272,7 +292,7 @@ testtLit = lt == (L T) && lf == (L F) && lm == (L M)
            where Just (lt, _) = parse tLit " T "
                  Just (lf, _) = parse tLit " F "
                  Just (lm, _) = parse tLit " M "
-
+{-
 testtVar :: Bool
 testtVar = id == (V "id") where Just (id, _) = parse tVar " id "
 
@@ -354,7 +374,7 @@ testtExp = lt == (L T) && lf == (L F) && lm == (L M) && pv == (V "id2")  && pe =
 
 testPart3 :: Bool
 testPart3 = testtLit && testtVar && testtPrim && testtFact && testtTerm && testtOpd && testtExp
-
+-}
 
 -- P A R T 4: Tautology Prover
 {- An expression is a tautology if it evaluates to T (True) regardless of the value assigned to
@@ -396,7 +416,7 @@ evaluation of the expression returns T regardless of the value assigned to the v
 
 {- This completes part 4 and the project. You can use the test functions below
 to test your work
--}
+-}{-
 testVarList :: Bool
 testVarList = varList (O (V "vT") (O (N (V "vM")) (E (V "vF") (L M)))) == ["vT", "vM", "vF"]
             && varList (O (L T) (O (N (L F)) (E (L M) (L M)))) == []
@@ -432,3 +452,4 @@ testPart4 = testVarList && testDictList && testTautology
 
 testAll :: Bool
 testAll = testPart1 && testPart2 && testPart3 && testPart4
+-}

@@ -261,52 +261,15 @@ It'll be easier to use the test functions if you give your parsers the same name
 they parse.
 -}
 
--- Turns character to ternary
+-- Some helper functions and parsers
+
+-- Turns character to ternary literal
 charToTernary :: Char -> Ternary
 charToTernary 'T' = T
 charToTernary 'F' = F
 charToTernary 'M' = M
 
-tLit :: Parser TExpTree
-tLit = do space
-          v <- (char 'T' +++ char 'F' +++ char 'M')
-          space
-          return (L (charToTernary v))
-
-tVar :: Parser TExpTree
-tVar = do v <- identifier
-          return (V v)
-
--- tPrim :: tVar | tLit | '('tExp')'
-tPrim :: Parser TExpTree
-tPrim = do v <- (tLit +++ tVar +++ tExpHelper)
-           return (v)
-
-tExpHelper :: Parser TExpTree
-tExpHelper = do space
-                char '('
-                v <- tExp
-                char ')'
-                space
-                return v
-
--- tExp :: tOpd ( '<=>' tExp | '==>' tExp| e )
-tExp :: Parser TExpTree
-tExp = do space
-          v <- tOpd
-          space
-          (do eqOperator
-              space
-              w <- tExp
-              space
-              return (E v w)
-           +++ (do impOperator
-                   space
-                   w <- tExp
-                   space
-                   return (I v w)
-                +++ return v))
-
+-- Parser that consumes "<=>"
 eqOperator :: Parser ()
 eqOperator = do space
                 char '<'
@@ -314,6 +277,7 @@ eqOperator = do space
                 char '>'
                 return ()
 
+-- Parser that consumes "==>"
 impOperator :: Parser ()
 impOperator = do space
                  char '='
@@ -321,6 +285,7 @@ impOperator = do space
                  char '>'
                  return ()
 
+-- Parser that consumes "|||"
 orOperator :: Parser ()
 orOperator = do space
                 char '|'
@@ -328,6 +293,7 @@ orOperator = do space
                 char '|'
                 return ()
 
+-- Parser that consumes "&&&"
 andOperator :: Parser ()
 andOperator = do space
                  char '&'
@@ -335,38 +301,90 @@ andOperator = do space
                  char '&'
                  return ()
 
+-- Grammar parsers
+
+-- Parser for tLit rule
+-- tLit :: T | F | M
+tLit :: Parser TExpTree
+tLit = do space
+          v <- (char 'T' +++ char 'F' +++ char 'M')
+          space
+          return (L (charToTernary v))
+
+-- Parser for tVar rule
+-- tVar :: lowercase (Alphanumeric)*
+tVar :: Parser TExpTree
+tVar = do v <- identifier
+          return (V v)
+
+-- Parser for tPrim rule
+-- tPrim :: tVar | tLit | '('tExp')'
+tPrim :: Parser TExpTree
+tPrim = do v <- (tLit +++ tVar +++ tPrimHelper)
+           return (v)
+
+-- Helper parser for third tPrim rule: reads the parentheses, with tExp in the middle
+tPrimHelper :: Parser TExpTree
+tPrimHelper = do space
+                 char '('
+                 v <- tExp
+                 char ')'
+                 space
+                 return v
+
+-- Parser for tExp rule
+-- tExp :: tOpd ( '<=>' tExp | '==>' tExp| e )
+tExp :: Parser TExpTree
+tExp = do space
+          v <- tOpd
+          space
+          (do eqOperator             -- tExp :: tOpd '<=>' tExp
+              space
+              w <- tExp
+              space
+              return (E v w)
+           +++ (do impOperator       -- tExp :: tOpd '==>' tExp
+                   space
+                   w <- tExp
+                   space
+                   return (I v w)
+                +++ return v))       -- tExp :: tOpd
+
+-- Parser for tOpd rule
 -- tOpd :: tTerm ( '|||' tOpd | e )
 tOpd :: Parser TExpTree
 tOpd = do space
           v <- tTerm
           space
-          (do orOperator
+          (do orOperator             -- tOpd :: tTerm '|||' tOpd
               space
               w <- tOpd
               space
               return (O v w)
-           +++ return v)
+           +++ return v)             -- tOpd :: tTerm
 
+-- Parser for tTerm rule
 -- tTerm :: tFact ( '&&&' tTerm | e)
 tTerm :: Parser TExpTree
 tTerm = do space
            v <- tFact
            space
-           (do andOperator
+           (do andOperator           -- tTerm :: tFact '&&&' tTerm
                space
                w <- tTerm
                space
                return (A v w)
-            +++ return v)
+            +++ return v)            -- tTerm :: tFact
 
+-- Parser for tFact rule
 -- tFact :: '~' tPrim | tPrim
 tFact = do space
-           (do char '~'
+           (do char '~'              -- tFact :: '~' tPrim
                space
                v <- tPrim
                space
                return (N v)
-            +++ (do space
+            +++ (do space            -- tFact :: tPrim
                     v <- tPrim
                     space
                     return v))
@@ -375,6 +393,8 @@ tFact = do space
 -- TODO: Implement a function parseT that takes a string as input
 -- and returns a ternary logic expression tree (TExpTree)
 
+-- parseT: if it parses with no remaining string, succeed with the TExpTree
+--         else, it throws error
 parseT :: String -> TExpTree
 parseT s = case parse tExp s of
                 Just(first, "") -> first
@@ -483,18 +503,22 @@ TODO: Create a function varList that takes as input a ternary logic expression t
 and retuns a list of all the variable names (strings) contained in the tree.
 -}
 
+-- varList to extract variables from TExpTree
+--         Extra: Ensures there are no duplicate variables in the list
 varList :: TExpTree -> [String]
 varList t = nub (varListHelper t)
 
+-- varListHelper: extracts the variables from the TExpTree. Duplicate variables
+--                are removed in the varList function
 varListHelper :: TExpTree -> [String]
 varListHelper t = case t of
                     (L _) -> []
                     (V var) -> [var]
-                    (N t1) -> varList t1
-                    (A t1 t2) -> varList t1 ++ varList t2
-                    (O t1 t2) -> varList t1 ++ varList t2
-                    (E t1 t2) -> varList t1 ++ varList t2
-                    (I t1 t2) -> varList t1 ++ varList t2
+                    (N t1) -> varListHelper t1
+                    (A t1 t2) -> varListHelper t1 ++ varListHelper t2
+                    (O t1 t2) -> varListHelper t1 ++ varListHelper t2
+                    (E t1 t2) -> varListHelper t1 ++ varListHelper t2
+                    (I t1 t2) -> varListHelper t1 ++ varListHelper t2
 
 {- Next we need to generate a dictionary for all the possible combinations of values
 that can be assigned to the variables.
@@ -511,6 +535,7 @@ dictList :: [String] -> [Dict]
 dictList [] = [[]]
 dictList (v:[]) = [[(v, tern)] | tern <- [T, F, M]]
 dictList (v:vs) = [[(v, tern)] ++ dict | tern <- [T, F, M], dict <- dictList vs]
+                  -- List comprehension to generate the combinations from adding another variable
 
 {-
 Now we can evaluate a ternary logic expression against all possible
@@ -520,12 +545,31 @@ returns in a list of the results (ternary logic literals) of evaluating the expr
 to all possible combination of values assigned to the variables (dictionaries)
 -}
 
+-- allCases: gets the varList from the TExpTree, then dictList to get all possible
+--           combinations of value. Then evaluate the TExpTree for each possible
+--           combination, record result in list.
+allCases :: TExpTree -> [Ternary]
+allCases t = [ evalT dict t | dict <- dictList(varList t)]
+
 {- Finally for the tautology checker.
 TODO: create a function isTautology that takes a string, parses it
 and return True if the expression contained in the string is a tautology. I.e. if the
 evaluation of the expression returns T regardless of the value assigned to the variables.
 -}
 
+-- Helper function for isTautology: True if all Ternary values in list are 'T',
+--                                  False if not
+allT :: [Ternary] -> Bool
+allT [] = False
+allT [T] = True
+allT [_] = False
+allT (T:terns) = allT terns
+allT (_:terns) = False
+
+-- isTautology: the String is a tautology if it parses to a TExpTree that, for all
+--              possible combinations of values for the variables, is 'T'.
+isTautology :: String -> Bool
+isTautology s = allT (allCases (parseT s))
 
 {- This completes part 4 and the project. You can use the test functions below
 to test your work
@@ -551,7 +595,7 @@ testDictList = dictList [] == [[]]
                  ,[("vT",T),("vM",F),("vF",M)],[("vT",F),("vM",F),("vF",M)],[("vT",M),("vM",F),("vF",M)]
                  ,[("vT",T),("vM",M),("vF",M)],[("vT",F),("vM",M),("vF",M)],[("vT",M),("vM",M),("vF",M)]]
 
-{-
+
 testTautology :: Bool
 testTautology = isTautology "v ||| ~v ||| (v <=> M)"
               && not (isTautology "v ||| ~v ")
@@ -565,4 +609,3 @@ testPart4 = testVarList && testDictList && testTautology
 
 testAll :: Bool
 testAll = testPart1 && testPart2 && testPart3 && testPart4
--}

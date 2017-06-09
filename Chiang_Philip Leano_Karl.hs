@@ -507,6 +507,10 @@ one for each of the 3 literal values in ternary logic. For 2 variables there wil
 values of the second variable, and so forth.
 -}
 
+dictList :: [String] -> [Dict]
+dictList [] = [[]]
+dictList (v:[]) = [[(v, tern)] | tern <- [T, F, M]]
+dictList (v:vs) = [[(v, tern)] ++ dict | tern <- [T, F, M], dict <- dictList vs]
 
 {-
 Now we can evaluate a ternary logic expression against all possible
@@ -525,7 +529,7 @@ evaluation of the expression returns T regardless of the value assigned to the v
 
 {- This completes part 4 and the project. You can use the test functions below
 to test your work
--}{-
+-}
 testVarList :: Bool
 testVarList = varList (O (V "vT") (O (N (V "vM")) (E (V "vF") (L M)))) == ["vT", "vM", "vF"]
             && varList (O (L T) (O (N (L F)) (E (L M) (L M)))) == []
@@ -547,7 +551,7 @@ testDictList = dictList [] == [[]]
                  ,[("vT",T),("vM",F),("vF",M)],[("vT",F),("vM",F),("vF",M)],[("vT",M),("vM",F),("vF",M)]
                  ,[("vT",T),("vM",M),("vF",M)],[("vT",F),("vM",M),("vF",M)],[("vT",M),("vM",M),("vF",M)]]
 
-
+{-
 testTautology :: Bool
 testTautology = isTautology "v ||| ~v ||| (v <=> M)"
               && not (isTautology "v ||| ~v ")

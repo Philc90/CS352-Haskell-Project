@@ -375,6 +375,10 @@ tFact = do space
 -- TODO: Implement a function parseT that takes a string as input
 -- and returns a ternary logic expression tree (TExpTree)
 
+parseT :: String -> TExpTree
+parseT s = first
+           where Just(first, "") = parse tExp s
+
 -- This completes part 3. You can use the following functions to test your implementation
 
 testtLit :: Bool

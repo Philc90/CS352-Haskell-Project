@@ -376,8 +376,10 @@ tFact = do space
 -- and returns a ternary logic expression tree (TExpTree)
 
 parseT :: String -> TExpTree
-parseT s = first
-           where Just(first, "") = parse tExp s
+parseT s = case parse tExp s of
+                Just(first, "") -> first
+                Just(_, _) -> error "Invalid Expression"
+                Nothing -> error "Invalid Expression"
 
 -- This completes part 3. You can use the following functions to test your implementation
 
@@ -480,6 +482,19 @@ the expression we want to prove is a tautologie.
 TODO: Create a function varList that takes as input a ternary logic expression tree (TExpTree)
 and retuns a list of all the variable names (strings) contained in the tree.
 -}
+
+varList :: TExpTree -> [String]
+varList t = nub (varListHelper t)
+
+varListHelper :: TExpTree -> [String]
+varListHelper t = case t of
+                    (L _) -> []
+                    (V var) -> [var]
+                    (N t1) -> varList t1
+                    (A t1 t2) -> varList t1 ++ varList t2
+                    (O t1 t2) -> varList t1 ++ varList t2
+                    (E t1 t2) -> varList t1 ++ varList t2
+                    (I t1 t2) -> varList t1 ++ varList t2
 
 {- Next we need to generate a dictionary for all the possible combinations of values
 that can be assigned to the variables.

@@ -261,25 +261,115 @@ It'll be easier to use the test functions if you give your parsers the same name
 they parse.
 -}
 
--- checks if the character is a ternary
-isTernary :: Char -> Bool
-isTernary 'T' = True
-isTernary 'F' = True
-isTernary 'M' = True
-isTernary _ = False
-
 -- Turns character to ternary
 charToTernary :: Char -> Ternary
 charToTernary 'T' = T
 charToTernary 'F' = F
 charToTernary 'M' = M
 
-
 tLit :: Parser TExpTree
 tLit = do space
-          v <- sat isTernary
+          v <- (char 'T' +++ char 'F' +++ char 'M')
           space
           return (L (charToTernary v))
+
+tVar :: Parser TExpTree
+tVar = do v <- identifier
+          return (V v)
+
+-- tPrim :: tVar | tLit | '('tExp')'
+tPrim :: Parser TExpTree
+tPrim = do v <- (tLit +++ tVar +++ tExpHelper)
+           return (v)
+
+tExpHelper :: Parser TExpTree
+tExpHelper = do space
+                char '('
+                v <- tExp
+                char ')'
+                space
+                return v
+
+-- tExp :: tOpd ( '<=>' tExp | '==>' tExp| e )
+tExp :: Parser TExpTree
+tExp = do space
+          v <- tOpd
+          space
+          (do eqOperator
+              space
+              w <- tExp
+              space
+              return (E v w)
+           +++ (do impOperator
+                   space
+                   w <- tExp
+                   space
+                   return (I v w)
+                +++ return v))
+
+eqOperator :: Parser ()
+eqOperator = do space
+                char '<'
+                char '='
+                char '>'
+                return ()
+
+impOperator :: Parser ()
+impOperator = do space
+                 char '='
+                 char '='
+                 char '>'
+                 return ()
+
+orOperator :: Parser ()
+orOperator = do space
+                char '|'
+                char '|'
+                char '|'
+                return ()
+
+andOperator :: Parser ()
+andOperator = do space
+                 char '&'
+                 char '&'
+                 char '&'
+                 return ()
+
+-- tOpd :: tTerm ( '|||' tOpd | e )
+tOpd :: Parser TExpTree
+tOpd = do space
+          v <- tTerm
+          space
+          (do orOperator
+              space
+              w <- tOpd
+              space
+              return (O v w)
+           +++ return v)
+
+-- tTerm :: tFact ( '&&&' tTerm | e)
+tTerm :: Parser TExpTree
+tTerm = do space
+           v <- tFact
+           space
+           (do andOperator
+               space
+               w <- tTerm
+               space
+               return (A v w)
+            +++ return v)
+
+-- tFact :: '~' tPrim | tPrim
+tFact = do space
+           (do char '~'
+               space
+               v <- tPrim
+               space
+               return (N v)
+            +++ (do space
+                    v <- tPrim
+                    space
+                    return v))
 
 
 -- TODO: Implement a function parseT that takes a string as input
@@ -292,7 +382,7 @@ testtLit = lt == (L T) && lf == (L F) && lm == (L M)
            where Just (lt, _) = parse tLit " T "
                  Just (lf, _) = parse tLit " F "
                  Just (lm, _) = parse tLit " M "
-{-
+
 testtVar :: Bool
 testtVar = id == (V "id") where Just (id, _) = parse tVar " id "
 
@@ -374,7 +464,7 @@ testtExp = lt == (L T) && lf == (L F) && lm == (L M) && pv == (V "id2")  && pe =
 
 testPart3 :: Bool
 testPart3 = testtLit && testtVar && testtPrim && testtFact && testtTerm && testtOpd && testtExp
--}
+
 
 -- P A R T 4: Tautology Prover
 {- An expression is a tautology if it evaluates to T (True) regardless of the value assigned to
